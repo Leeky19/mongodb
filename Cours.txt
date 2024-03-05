@@ -1,0 +1,375 @@
+Dernière partie de la merge stack
+
+
+arzourjulien
+tDQIz1JbVRS4dsMS
+
+
+c'est à l'insertion de la clef et de la valeur que la bdd est créée. 
+
+![[Pasted image 20240304102008.png]]
+
+```shell
+db.ma_Collection.insertOne({ "cle": "valeur" })
+```
+
+changer la valeur d'une cle :
+```shell
+db.ma_Collection.updateOne( { "prenom": "Yuri" }, { $set : { "prenom" : "YURI" }})
+```
+
+
+Rechercher et ne restortir que les prenom/champs spé mais on aura le champ de l'id : 
+
+```Shell
+db.ma_Collection.find({ "age" : "23" }, {"prenom" : 1 })
+```
+
+Sans le champs id :
+```Shell
+db.ma_Collection.find({ "age" : "23" }, {"prenom" : 1 , "_id" : 0 })
+```
+
+
+Personne qui n'ont pas 76ans : 
+```Shell
+db.personnes.find({"age": {$ne : 76}}, {"_id" : 0, "prenom" : 1 })
+```
+![[Pasted image 20240304122923.png]]
+
+Personnes qui n'ont pas 70 ou 80 ans : 
+```Shell
+db.personnes.find({"age" : {$nin : [70, 80 ]}}, {"_id" : 0, "prenom" : 1 , "nom" : 1 })
+```
+![[Pasted image 20240304123310.png]]
+
+Même chose mais on ne prends que les personne qui ont un formulaire complet et avec l'opérateur logique ET :
+```Shell
+db.personnes.find({ $and : [{"age": {$nin : [70,80]}}, {"age": {$exists : true}}]}, {_id: 0, nom:1, prenom: 1 })
+```
+![[Pasted image 20240304134206.png]]
+
+
+$clé = valeur équivalent du this en Programmation Objet.
+
+
+
+Exercice banque : 
+```Shell 
+db.banque.find({
+ "debit": { $exists: 1 },
+ "credit": { $exists: 1 },
+ $expr: { $gt: [ {$sum: "$debit"}, "$credit"]}
+ },
+ {"_id":1}
+)
+```
+
+$sum peut s'effectuer sur tout un tableau.
+
+Correction : 
+```Shell
+db.banque.find({
+ "debit": { $exists: 1 },
+ $expr: { $gt: [ {$sum: "$debit"}, "$credit"]}
+ }
+)
+```
+
+
+Si on veut un résultat sans tableau il faut pensé à supp les [] dans les requêtes de résultats
+
+tri croissant : 1
+tri décroissant : -1
+
+
+
+Exercice 1 : salle qui sont des smac : 
+```Shell
+db.salles.find({ smac: true }, { nom: 1 })
+```
+2 documents : nom: 'AJMI Jazz Club' & 'Paloma'
+
+
+
+
+Exercice 2 : salles qui ont la capacité d'accueil supérieur à 1000 : 
+```Shell
+db.salles.find({ capacite: { $gt: 1000 } }, { _id: 0, nom: 1 })
+```
+1 document : nom: 'Paloma'
+
+
+
+Exercice 3 : Affichez l’identifiant des salles pour lesquelles le champ adresse ne comporte pas de numéro. 
+
+```Shell
+db.salles.find({ "adresse.numero": { $exists: false } }, { _id: 1 })
+```
+1 document : _id: 3
+
+
+Exercice 4 : Affichez l’identifiant puis le nom des salles qui ont exactement un avis.
+```Shell
+db.salles.find({ avis: { $size: 1 } }, { _id: 1, nom: 1 })
+```
+1 document : {
+  _id: 2,
+  nom: 'Paloma'
+}
+
+L'opérateur `$size` en MongoDB est utilisé pour sélectionner les documents où le tableau associé à un champ contient un nombre spécifique d'éléments (ici on cherche les tableaux d'avis qui n'ont qu'un seul avis).
+
+
+
+Exercice 5 : Affichez tous les styles musicaux des salles qui programment notamment du blues.
+```Shell
+db.salles.find({ styles: "blues" }, { _id: 0, nom: 1 , styles: 1 })
+```
+2 documents :  nom: 'AJMI Jazz Club' & 'Sonograf'
+
+
+
+Exercice 6 : Affichez tous les styles musicaux des salles qui ont le style « blues » en première position dans leur tableau styles.
+```Shell
+db.salles.find({ "styles.0": "blues" }, { _id: 0, nom : 1, styles: 1 })
+```
+1 document : nom: 'Sonograf',  styles: ['blues','rock']
+'style.X' x est la place de l'élément dans le tableau (ressemble à ce qu'on peut faire en C++)
+
+
+
+Exercice 7 : Affichez la ville des salles dont le code postal commence par 84 et qui ont une capacité strictement inférieure à 500 places (pensez à utiliser une expression régulière).
+
+```Shell
+db.salles.find({ 
+    "adresse.codePostal": { $gte: "84000", $lt: "85000" }, 
+    capacite: { $lt: 500 }
+}, { _id: 0, nom : 1, "adresse.ville": 1 })
+```
+2 documents : 
+
+{
+  nom: 'AJMI Jazz Club',
+  adresse: {
+    ville: 'Avignon'
+  }
+}
+
+{
+  nom: 'Sonograf',
+  adresse: {
+    ville: 'Le Thor'
+  }
+}
+
+$gte = plus grand ou égale >=
+$lt = plus petit <
+
+
+
+Exercice 8 : Affichez l’identifiant pour les salles dont l’identifiant est pair ou le champ avis est absent.
+
+```Shell
+db.salles.find({ 
+    $or: [
+        { _id: { $mod: [2, 0] } }, 
+        { avis: { $exists: false } }
+    ]
+}, { _id: 1 })
+
+```
+2 Documents : 
+{
+  _id: 2,
+  nom: 'Paloma'
+}
+&
+{
+  _id: 3,
+  nom: 'Sonograf'
+}
+
+{ _id: { $mod: [2, 0] } }, l'identifiant pair en utilisant $mod (modulo)
+{ avis: { $exists: false } }  le champ avis est absent 
+
+
+
+Exercice 9: Affichez le nom des salles dont au moins un des avis comporte une note comprise entre 8 et 10 (tous deux inclus).
+```Shell
+db.salles.find(
+    {
+        "avis.note": { $gte: 8, $lte: 10 }
+    },
+    { _id: 0, nom: 1 }
+)
+```
+2 documents : nom: 'Paloma' & 'AJMI Jazz Club'
+
+
+
+Exercice 10 : Affichez le nom des salles dont au moins un des avis comporte une date postérieure au 15/11/2019 (pensez à utiliser le type JavaScript Date).
+
+```Shell
+db.salles.find(
+    {
+        "avis.date": { $gt: new Date("2019-11-15") }
+    },
+    { _id: 0, nom: 1 }
+)
+```
+1 Document : nom: 'AJMI Jazz Club'
+
+
+
+Exercice 11 : Affichez le nom ainsi que la capacité des salles dont le produit de la valeur de l’identifiant par 100 est strictement supérieur à la capacité.
+```Shell
+db.salles.find(
+    { 
+        $expr: { 
+            $gt: [{ $multiply: ["$_id", 100] }, "$capacite"] 
+        } 
+    }, 
+    { _id: 0, nom: 1, capacite: 1 }
+)
+```
+1 document : 
+{
+  _id: 3,
+  nom: 'Sonograf',
+  capacite: 200
+}
+
+
+
+Exercice 12 : Affichez le nom des salles de type SMAC programmant plus de deux styles de musiques différents en utilisant l’opérateur $where qui permet de faire usage de JavaScript.
+
+```Shell
+db.salles.find({
+    smac: true,
+    $where: function() {
+        return this.styles.length > 2;
+    }
+}, { _id: 0, nom: 1 });
+```
+1 Document : nom : 'AJMI Jazz Club'
+
+
+
+Exercice 13 Affichez les différents codes postaux présents dans les documents de la collection salles.
+```Shell
+db.salles.distinct("adresse.codePostal")
+```
+[ '30000', '84000', '84250' ]
+
+doc: https://www.mongodb.com/docs/manual/reference/method/db.collection.distinct/
+
+
+
+Exercice 14 : Mettez à jour tous les documents de la collection salles en rajoutant 100 personnes à leur capacité actuelle.
+```Shell
+db.salles.updateMany(
+    {},
+    { $inc: { capacite: 100 } }
+)
+```
+Réponse de la requête :
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 3,
+  modifiedCount: 3,
+  upsertedCount: 0
+}
+
+Ici le filtre est vide car on souhaite appliquer la modification sur toute la collection.
+L'opérateur $inc sert à incrémenter la capacité de 100. https://www.mongodb.com/docs/manual/reference/operator/update/inc/
+
+
+
+Exercice 15 : Ajoutez le style « jazz » à toutes les salles qui n’en programment pas.
+```Shell
+db.salles.updateMany(
+    { styles: { $ne: "jazz" } },
+    { $addToSet: { styles: "jazz" } }
+)
+```
+Réponse : 
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 2,
+  modifiedCount: 2,
+  upsertedCount: 0
+}
+`$ne`sélectionne les documents où la valeur de la le champ spécifié n'est pas égal à la valeur spécifiée. Cela inclut les documents qui ne contiennent pas le champ spécifié. https://www.mongodb.com/docs/manual/reference/operator/query/ne/
+
+
+
+Exercice 16 : Retirez le style «funk» à toutes les salles dont l’identifiant n’est égal ni à 2, ni à 3.
+```Shell
+db.salles.updateMany(
+    { _id: { $nin: [2, 3] } }, 
+    { $pull: { styles: "funk" } } 
+)
+```
+
+Réponse : 
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 1,
+  modifiedCount: 1,
+  upsertedCount: 0
+}
+
+Sélectionne les salles dont l’identifiant n’est pas égal à 2 ni à 3 :
+`$nin` sélectionne les documents où :
+la valeur de champ spécifiée n'est pas dans le tableau spécifié ou le champ spécifié n'existe pas.
+https://www.mongodb.com/docs/manual/reference/operator/query/nin/
+
+Retire le style "funk" des salles sélectionnées :
+L'opérateur `$pull` supprime d'un tableau existant toutes les instances d'une ou plusieurs valeurs qui correspondent à une condition spécifiée.
+https://www.mongodb.com/docs/manual/reference/operator/update/pull/
+
+
+
+Exercice 17 : Ajoutez un tableau composé des styles «techno» et « reggae » à la salle dont l’identifiant est 3.
+```Shell
+db.salles.updateOne( { _id: 3 }, { $set: { styles: ["techno", "reggae"]}})
+```
+Réponse :
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 1,
+  modifiedCount: 1,
+  upsertedCount: 0
+}
+
+
+
+Exercice 18 : Pour les salles dont le nom commence par la lettre P (majuscule ou minuscule), augmentez la capacité de 150 places et rajoutez un champ de type tableau nommé contact dans lequel se trouvera un document comportant un champ nommé telephone dont la valeur sera « 04 11 94 00 10 ».
+
+```Shell
+db.salles.updateMany(
+    { $or: [ { nom: /^P/ }, { nom: /^p/ } ] }, 
+    { 
+        $inc: { capacite: 150 }, 
+        $set: {
+            contact: [{ nom: "telephone", valeur: "04 11 94 00 10" }]
+        }
+    }
+)
+```
+Réponse : 
+{
+  acknowledged: true,
+  insertedId: null,
+  matchedCount: 1,
+  modifiedCount: 1,
+  upsertedCount: 0
+}
+
+L'opérateur `$or` effectue une opération logique `OR`  sur un tableau de _un ou plusieurs_ `<expressions>` et sélectionne les documents qui satisfait  _au moins_ l'une des `<expressions>`.
+https://www.mongodb.com/docs/manual/reference/operator/query/or/
