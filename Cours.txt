@@ -406,7 +406,136 @@ db.salles.insertOne(
 
 Que proposez-vous pour régulariser la situation ?
 
+### Cours Index et Géo
 
+## Les types d'index
+
+### Index simples
+
+Voici la syntaxe generale pour créer un index simple :
+
+```
+db.collection.createIndex(<field + type> , <options>)
+```
+
+Pour la suite de ce cours on utilisera la nouvelle version de la collection personnes (cf Teams)
+
+pour une creer un index sur le champ age:
+
+```
+db.personnes.createIndex({ age: 1 });
+```
+
+Pour supprimer un index :
+
+```
+db.personnes.dropIndex({<nom de l'index>})
+```
+
+Pour nommer un index :
+
+```
+db.personnes.createIndex({ age: 1 }, { name: "age_index" });
+```
+
+Au sein d'une collection de grande taille la creation d'inexes peut prendre du temps, pour ne pas bloquer les autres opérations, on peut utiliser l'option `background` :
+
+```
+db.personnes.createIndex({ age: 1 }, { background: true });
+```
+
+### Index Geospatiaux
+
+MongoDB supporte deux types d'index géospatiaux : 2d et 2dsphere.
+
+Les indexs 2Dsphere gerent deux types de coordonnees :
+
+- les coordonees dites `legacy` : [longitude, latitude]
+- les coordonnees dites `GeoJSON` : {type: "Point", coordinates: [longitude, latitude]}
+
+Les index 2d sphere font intervenir l'utilisation d'objets GEoJSOn dont la structure est la suivante :
+
+```
+{
+  type: "Point",
+  coordinates: [ <longitude>, <latitude> ]
+}
+```
+
+On peut creer d'autres type d'objets GeoJSON, en voici quelques uns :
+
+```
+{
+    "type": 'MultiPoint',
+    "coordinates": [[ <longitude>, <latitude> ], [ <longitude>, <latitude> ], ...]
+}
+```
+
+```
+{
+    "type": '?????',
+    "coordinates": [[ <longitude>, <latitude> ], [ <longitude>, <latitude> ]]
+}
+```
+
+Le type Polygon est utilisé pour décrire des formes géométriques fermées. Un polygone est défini par un tableau de coordonnées de points, le premier et le dernier point doivent être les mêmes pour fermer la forme.
+
+```
+{
+    "type": 'Polygon',
+    "coordinates": [
+        [ [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ] ]
+    ]
+}
+```
+
+## Les requetes geospatiales
+
+Pre-requis : creation de la collection Avignon Creation d'un index 2dsphere sur le champ localisation
+
+```
+db.avignon.createIndex({ localisation: "2dsphere" });
+```
+
+#### L'operateur $nearSphere
+
+Cet opérateur requiert un index géospatial de type 2dsphere quand on l’utilise avec des objets GeoJSON et un index 2d quand il est utilisé avec des coordonnées de type legacy. Lorsqu’il opère sur des objets GeoJSON de type Point, sa syntaxe est :
+
+```
+{
+  <location field>: {
+    $nearSphere: {
+      $geometry: {
+        type: "Point" ,
+        coordinates: [ <longitude>, <latitude> ]
+      },
+      $minDistance: <distance in meters>,
+      $maxDistance: <distance in meters>
+    }
+  }
+}
+```
+
+![[Pasted image 20240307001930.png]]
+
+#### L'operateur $geoWithin
+
+Cet opérateur requiert un index géospatial de type 2dsphere. Il permet de sélectionner les documents qui sont entièrement inclus dans une zone géographique donnée. Sa syntaxe est la suivante :
+
+```
+{
+  <location field>: {
+    $geoWithin: {
+      $geometry: {
+        type: "Polygon" ,
+        coordinates: [ [ [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ], [ <longitude>, <latitude> ] ]
+      }
+    }
+  }
+}
+```
+
+![[Pasted image 20240307002007.png]]
 
 ### Exercice de Géo 
 
