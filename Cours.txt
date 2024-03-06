@@ -1,7 +1,6 @@
 Dernière partie de la merge stack
 
 
-
 c'est à l'insertion de la clef et de la valeur que la bdd est créée. 
 
 ![[Pasted image 20240304102008.png]]
@@ -80,6 +79,7 @@ tri croissant : 1
 tri décroissant : -1
 
 
+### Exercice Salle
 
 Exercice 1 : salle qui sont des smac : 
 ```Shell
@@ -142,7 +142,7 @@ Exercice 7 : Affichez la ville des salles dont le code postal commence par 84 et
 db.salles.find({ 
     "adresse.codePostal": { $gte: "84000", $lt: "85000" }, 
     capacite: { $lt: 500 }
-}, { _id: 0, nom : 1, "adresse.ville": 1 })
+}, { _id: 0, "nom" : 1, "adresse.ville": 1 })
 ```
 2 documents : 
 
@@ -372,6 +372,8 @@ L'opérateur `$or` effectue une opération logique `OR`  sur un tableau de _u
 https://www.mongodb.com/docs/manual/reference/operator/query/or/
 
 
+
+
 ### Cours 
 #### Index
 ##### Index simple
@@ -445,10 +447,13 @@ db.salles.find(requete, { nom: 1 });
 ```
 $maxDistance: 60 * 1000 // 60 kilomètres convertis en mètres
 Document :
+```Shell
 {
   _id: 1,
   nom: 'AJMI Jazz Club'
 }
+```
+
 
 
 Exercice 2 : Écrivez la requête qui permet d’obtenir la ville des salles situées dans un rayon de 100 kilomètres autour de Marseille, triées de la plus proche à la plus lointaine :
@@ -458,3 +463,593 @@ var marseille = {"type": "Point", "coordinates": [43.300000, 5.400000]}
  
 db.salles.find(...) 
 ```
+
+Réponse :
+
+Bien pensé à créer un index si on veut utiliser les opérateurs `$nearSphere` ou `$geoWithin` : 
+```Shell
+db.salles.createIndex({ "adresse.localisation": "2dsphere" }); 
+//prends en compte le format legacy et GeoJSon
+```
+
+```Shell
+var marseille = { "type": "Point", "coordinates": [43.300000, 5.400000] };
+
+db.salles.find({
+  "adresse.localisation": {
+    $nearSphere: {
+      $geometry: marseille,
+      $maxDistance: 100000 // Distance maximale en mètres (100 kilomètres)
+    }
+  }
+}, { "adresse.ville": 1 });
+```
+
+Documents :
+```Shell
+{
+  _id: 3,
+  adresse: {
+    ville: 'Le Thor'
+  }
+}
+{
+  _id: 3,
+  adresse: {
+    ville: 'Le Thor'
+  }
+}
+```
+
+
+
+Exercice 3:
+
+Soit polygone un objet GeoJSON de la forme suivante :
+
+```
+var polygone = { 
+     "type": "Polygon", 
+     "coordinates": [ 
+            [ 
+               [43.94899, 4.80908], 
+               [43.95292, 4.80929], 
+               [43.95174, 4.8056], 
+               [43.94899, 4.80908] 
+            ] 
+     ] 
+} 
+```
+
+Donnez le nom des salles qui résident à l’intérieur.
+
+```Shell
+var polygone = {
+  "type": "Polygon",
+  "coordinates": [
+    [
+      [43.94899, 4.80908],
+      [43.95292, 4.80929],
+      [43.95174, 4.8056],
+      [43.94899, 4.80908]
+    ]
+  ]
+};
+
+db.salles.find({
+  "adresse.localisation": {
+    $geoWithin: {
+      $geometry: polygone
+    }
+  }
+}, { nom: 1 });
+
+```
+
+Réponse : 
+```Shell
+var polygone = {
+  "type": "Polygon",
+  "coordinates": [
+    [
+      [43.94899, 4.80908],
+      [43.95292, 4.80929],
+      [43.95174, 4.8056],
+      [43.94899, 4.80908]
+    ]
+  ]
+};
+
+db.salles.find({
+  "adresse.localisation": {
+    $geoWithin: {
+      $geometry: polygone
+    }
+  }
+}, { nom: 1 });
+```
+
+Sortie : 
+```Shell
+{
+  _id: 1,
+  nom: 'AJMI Jazz Club'
+}
+```
+
+
+
+
+### Exercice Achat 
+```Shell
+db.achats.insertMany([{     "nom": "Pascal",     "prenom": "Léo",     "achats": [112.29, 88.36, 72.01],     "reductions": [12.30, 2.01]  },  {     "nom": "Perez",     "prenom": "Alex",     "achats": [20.01, 296.35],     "reductions": [9.91, 0.87]  }])
+```
+
+Ecrivez un pipeline aggregation qui permet d’obtenir le total payé par personnes et arrondissez.
+
+```Shell
+db.achats.aggregate([
+  {
+    $project: {
+      nom: 1,
+      prenom: 1,
+      totalAchats: { $sum: "$achats" },
+      totalReductions: { $sum: "$reductions" }
+    }
+  },
+  {
+    $addFields: {
+      totalPaye: { $subtract: ["$totalAchats", "$totalReductions"] }
+    }
+  },
+  {
+    $group: {
+      _id: { nom: "$nom", prenom: "$prenom" },
+      totalPaye: { $sum: "$totalPaye" }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      nom: "$_id.nom",
+      prenom: "$_id.prenom",
+      totalPayeArrondi: { $round: ["$totalPaye", 2] }
+    }
+  }
+])
+```
+
+Réponse : 
+2 Documents : 
+```Shell
+{
+  nom: 'Pascal',
+  prenom: 'Léo',
+  totalPayeArrondi: 258.35
+}
+{
+  nom: 'Perez',
+  prenom: 'Alex',
+  totalPayeArrondi: 305.58
+}
+```
+
+
+
+```Shell
+db.ventes.aggregate([
+{$lookup : 
+	{
+		"from" : "artistes",
+		"localField" : "artiste",
+		"foreignField" : "nom",
+		"as" : "detail_artiste"
+	}
+}
+])
+```
+
+Réponse : 
+```Shell
+{
+  _id: ObjectId('65e84b81f3d762e2a248a38c'),
+  artiste: 'Michael Jackson',
+  nb_units: 84000000,
+  detail_artiste: [
+    {
+      _id: ObjectId('65e84b81f3d762e2a248a38a'),
+      nom: 'Michael Jackson',
+      pays: 'USA'
+    }
+  ]
+}
+{
+  _id: ObjectId('65e84b81f3d762e2a248a38d'),
+  artiste: 'The Beatles',
+  nb_units: 183000000,
+  detail_artiste: [
+    {
+      _id: ObjectId('65e84b81f3d762e2a248a38b'),
+      nom: 'The Beatles',
+      pays: 'ENG'
+    }
+  ]
+}
+```
+
+
+### Agrégation 
+#### Exercice 
+Exercice 1
+
+Écrivez le pipeline qui affichera dans un champ nommé ville le nom de celles abritant une salle de plus de 50 personnes ainsi qu’un booléen nommé grande qui sera positionné à la valeur « vrai » lorsque la salle dépasse une capacité de 1 000 personnes. Voici le squelette du code à utiliser dans le shell :
+
+```
+var pipeline = [ 
+... 
+] 
+```
+
+db.salles.aggregate(pipeline)
+
+```Shell
+var pipeline = [ 
+  {
+    $match: {
+      capacite: { $gt: 50 } // Filtrer les salles ayant une capacité de plus de 50 personnes
+    }
+  },
+  {
+    $project: {
+      _id: 0, // Exclure le champ _id du résultat final
+      ville: "$adresse.ville", // Créer le champ ville avec le nom de la ville
+      grande: { $gt: ["$capacite", 1000] } // Créer le champ grande avec la condition si la capacité est supérieure à 1000
+    }
+  }
+]; 
+
+db.salles.aggregate(pipeline);
+```
+
+Réponse  : 2 Documents :
+```Shell
+{
+  ville: 'Le Thor',
+  grande: false
+}
+{
+  ville: 'Nîmes',
+  grande: true
+}
+{
+  ville: 'Avignon',
+  grande: false
+}
+```
+
+
+
+ Exercice 2
+
+Écrivez le pipeline qui affichera dans un champ nommé apres_extension la capacité d’une salle augmentée de 100 places, dans un champ nommé avant_extension sa capacité originelle, ainsi que son nom.
+
+```Shell
+var pipeline = [ 
+  {
+    $addFields: {
+      avant_extension: "$capacite", 
+      apres_extension: { $add: ["$capacite", 100] }
+    }
+  },
+  {
+    $project: {
+      _id: 0, // Exclure le champ _id du résultat final
+      nom: 1, // Inclure le champ nom
+      avant_extension: 1, // Inclure le champ avant_extension
+      apres_extension: 1 // Inclure le champ apres_extension
+    }
+  }
+]; 
+
+db.salles.aggregate(pipeline);
+```
+avant_extension: "$capacite", // Créer le champ avant_extension avec la capacité originale
+
+Réponse : 3 Documents : 
+```Shell
+{
+  nom: 'AJMI Jazz Club',
+  avant_extension: 400,
+  apres_extension: 500
+}
+
+  nom: 'Paloma',
+  avant_extension: 4250,
+  apres_extension: 4350
+}
+  nom: 'Paloma',
+  avant_extension: 4250,
+  apres_extension: 4350
+}
+```
+
+
+Exercice 3
+
+Écrivez le pipeline qui affichera, par numéro de département, la capacité totale des salles y résidant. Pour obtenir ce numéro, il vous faudra utiliser l’opérateur $substrBytes dont la syntaxe est la suivante :
+
+```
+{$substrBytes: [ < chaîne de caractères >, < indice de départ >, 
+< longueur > ]} 
+```
+
+```Shell
+var pipeline = [
+  {
+    $project: { //selection des champs
+      codePostal: "$adresse.codePostal",
+      capacite: "$capacite" 
+    }
+  },
+  {
+    $group: {
+      _id: { $substrBytes: ["$codePostal", 0, 2] }, // Extrait les deux premiers caractères du code postal comme numéro de département
+      capaciteTotale: { $sum: "$capacite" } // Calculer la capacité totale des salles pour chaque département
+    }
+  }
+];
+
+db.salles.aggregate(pipeline);
+```
+
+Réponse : 
+```Shell
+{
+  _id: '84',
+  capaciteTotale: 700
+}
+{
+  _id: '30',
+  capaciteTotale: 4250
+}
+```
+
+
+
+Exercice 4 
+
+Écrivez le pipeline qui affichera, pour chaque style musical, le nombre de salles le programmant. Ces styles seront classés par ordre alphabétique.
+
+```Shell
+var pipeline = [
+  {
+    $unwind: "$styles" // Décompos le tableau de styles en documents individuels
+  },
+  {
+    $group: {
+      _id: "$styles", // Groupe par style musical
+      nombreSalles: { $sum: 1 } // Compte le nombre de salles pour chaque style musical
+    }
+  },
+  {
+    $sort: { _id: 1 } // Tri les résultats par ordre alphabétique du style musical
+  }
+];
+
+db.salles.aggregate(pipeline);
+```
+
+Réponse : 
+```Shell
+{
+  _id: 'blues',
+  nombreSalles: 1
+}
+{
+  _id: 'jazz',
+  nombreSalles: 2
+}
+{
+  _id: 'reggae',
+  nombreSalles: 1
+}
+{
+  _id: 'soul',
+  nombreSalles: 1
+}
+{
+  _id: 'techno',
+  nombreSalles: 1
+}
+```
+
+
+
+Exercice 5
+
+À l’aide des buckets, comptez les salles en fonction de leur capacité :celles de 100 à 500 places ,
+celles de 500 à 5000 places
+
+```Shell
+var pipeline = [
+  {
+    $bucket: {
+      groupBy: "$capacite", // Champ à regrouper (capacité des salles)
+      boundaries: [100, 500, 5000], // Fixe les Limites des buckets
+      default: "Other", // Bucket par défaut pour les valeurs en dehors des limites spécifiées
+      output: {
+        salles: { $push: "$nom" }, // Permet de stocker le nom des salles dans chaque bucket
+        count: { $sum: 1 } // Compte le nombre de salles dans chaque bucket
+      }
+    }
+  }
+];
+
+db.salles.aggregate(pipeline);
+```
+
+Réponse : 
+```Shell
+{
+  _id: 100,
+  salles: [
+    'Sonograf',
+    'AJMI Jazz Club'
+  ],
+  count: 2
+}
+{
+  _id: 500,
+  salles: [
+    'Paloma'
+  ],
+  count: 1
+}
+```
+
+
+
+Exercice 6
+
+Écrivez le pipeline qui affichera le nom des salles ainsi qu’un tableau nommé avis_excellents qui contiendra uniquement les avis dont la note est de 10.
+
+```Shell
+
+
+N affiche que les salle qui ont un avis de 10 :
+
+var pipeline = [
+  {
+    $match: {
+      "avis.note": 10 //Filtre les documents où au moins un avis a une note de 10
+    }
+  },
+  {
+    $project: {
+      nom: 1, // Conserver le champ nom
+      avis_excellents: {
+        $filter: {
+          input: "$avis", // Champ à filtrer (tableau d avis)
+          as: "avis", // Alias pour chaque élément du tableau
+          cond: { $eq: ["$$avis.note", 10] } // Condition de filtrage (note égale à 10)
+        }
+      }
+    }
+  }
+];
+
+db.salles.aggregate(pipeline);
+
+
+OU
+
+
+Affiche toutes les salles et leur avis, si pas de champs avis null, si pas d avis de 10 le tableau est vide.
+
+var pipeline = [
+  {
+    $project: {
+      nom: 1,
+      avis_excellents: { 
+        $filter: {
+          input: "$avis", 
+          as: "avis", 
+          cond: { $eq: ["$$avis.note", 10] }
+        }
+      }
+    }
+  }
+];
+
+db.salles.aggregate(pipeline);
+```
+
+Réponse :
+```Shell
+V1 :
+{
+  _id: 2,
+  nom: 'Paloma',
+  avis_excellents: [
+    {
+      date: 2019-07-06T00:00:00.000Z,
+      note: 10
+    }
+  ]
+}
+
+
+V2 : 
+{
+  _id: 3,
+  nom: 'Sonograf',
+  avis_excellents: null
+}
+{
+  _id: 1,
+  nom: 'AJMI Jazz Club',
+  avis_excellents: []
+}
+{
+  _id: 2,
+  nom: 'Paloma',
+  avis_excellents: [
+    {
+      date: 2019-07-06T00:00:00.000Z,
+      note: 10
+    }
+  ]
+}
+```
+
+
+
+
+### Exercice perso
+
+#### Importation d'un csv dans Mongo DB Compas.
+- Téléchargé la base de données
+- Ouvrir Mongo DB Compas
+- Se connecter au serveur local host en ayant préalablement installé Mongo DB Community Version sur la machine et avoir modifier les variables d'environnement.
+- Créer un nouvelle base de donnée et un nouvelle collection.
+- Cliquer sur importer des donnée et sélectionné le fichier.csv
+- Décocher l'ignorance de string vide et les colonnes du tableau qui ne seront pas exploités (les documents n'auront pas de champs du nom des colonnes)
+- Cliquer sur importer
+- Ecrire dans la console `use Nom_de_la_bdd`
+
+#### Compter le nombre de valeurs pour un champs
+```Shell
+db.test.aggregate([
+  {
+    $match: {
+      brand: "Dell"
+    }
+  },
+  {
+    $count: "total"
+  }
+]);
+```
+
+remplacer test par le nom de la collection
+brand par la nom du champs souhaiter
+"Dell" par le nom de la valeur
+
+#### Compter le nombre de champs qui on soit une valeur soit une autre 
+
+```Shell
+db.collection.aggregate([
+  {
+    $match: {
+      $or: [
+        { brand: "Dell" },
+        { brand: "Microsoft" }
+      ]
+    }
+  },
+  {
+    $count: "total"
+  }
+]);
+```
+$count: "total" // Compter le nombre total de documents correspondants
