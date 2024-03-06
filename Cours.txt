@@ -1,9 +1,6 @@
 Dernière partie de la merge stack
 
 
-arzourjulien
-tDQIz1JbVRS4dsMS
-
 
 c'est à l'insertion de la clef et de la valeur que la bdd est créée. 
 
@@ -373,3 +370,91 @@ Réponse :
 
 L'opérateur `$or` effectue une opération logique `OR`  sur un tableau de _un ou plusieurs_ `<expressions>` et sélectionne les documents qui satisfait  _au moins_ l'une des `<expressions>`.
 https://www.mongodb.com/docs/manual/reference/operator/query/or/
+
+
+### Cours 
+#### Index
+##### Index simple
+
+voici une synttaxe générale pour créer un index simple :
+
+```Shell
+db.collection.creatIndex(<field + type >, <options>)
+```
+
+
+
+### Exercice Validation 
+
+Exercice 1 : Modifiez la collection salle afin que soient dorénavant validés les documents destinés à y être insérés ; cette validation aura lieu en mode « strict » et portera sur les champs suivants :
+
+nom sera obligatoire et devra être de type chaîne de caractères.
+
+capacité sera obligatoire et devra être de type entier (int).
+
+Dans le champ adresse, les champs codePostal et ville, tous deux de type chaîne de caractères, seront obligatoires.
+
+Que constatez-vous lors de la tentative d’insertion suivante, et quelle en est la cause ?
+
+```
+db.salles.insertOne( 
+{"nom": "Super salle", "capacite": 1500, "adresse": {"ville": "Musiqueville"}} 
+) 
+```
+
+Que proposez-vous pour régulariser la situation ?
+
+
+
+### Exercice de Géo 
+
+Exercice 1 : Vous disposez du code JavaScript suivant qui comporte une fonction de conversion d’une distance exprimée en kilomètres vers des radians ainsi que d’un document dont les coordonnées serviront de centre à notre sphère de recherche. Écrivez la requête $geoWithin qui affichera le nom des salles situées dans un rayon de 60 kilomètres et qui programment du Blues et de la Soul.
+
+```
+var KilometresEnRadians = function(kilometres){ 
+   var rayonTerrestreEnKm = 6371; 
+   return kilometres / rayonTerrestreEnKm; 
+}; 
+ 
+var salle = db.salles.findOne({"adresse.ville": "Nîmes"}); 
+ 
+var requete = { ... }; 
+ 
+db.salles.find(requete ... }; 
+```
+
+Réponse : 
+```Shell
+var KilometresEnRadians = function(kilometres){ 
+   var rayonTerrestreEnKm = 6371; 
+   return kilometres / rayonTerrestreEnKm; 
+}; 
+
+var salle = db.salles.findOne({"adresse.ville": "Nîmes"}); 
+
+var requete = { 
+   "adresse.localisation": {
+      $geoWithin: {
+         $centerSphere: [ [ salle.adresse.localisation.coordinates[0], salle.adresse.localisation.coordinates[1] ], KilometresEnRadians(60) ]
+      }
+   },
+   styles: { $all: ["blues", "soul"] }
+}; 
+
+db.salles.find(requete, { nom: 1 });
+```
+$maxDistance: 60 * 1000 // 60 kilomètres convertis en mètres
+Document :
+{
+  _id: 1,
+  nom: 'AJMI Jazz Club'
+}
+
+
+Exercice 2 : Écrivez la requête qui permet d’obtenir la ville des salles situées dans un rayon de 100 kilomètres autour de Marseille, triées de la plus proche à la plus lointaine :
+
+```
+var marseille = {"type": "Point", "coordinates": [43.300000, 5.400000]} 
+ 
+db.salles.find(...) 
+```
