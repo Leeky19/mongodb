@@ -574,7 +574,6 @@ var requete = {
 
 db.salles.find(requete, { nom: 1 });
 ```
-$maxDistance: 60 * 1000 // 60 kilomètres convertis en mètres
 Document :
 ```Shell
 {
@@ -968,6 +967,25 @@ var pipeline = [
 db.salles.aggregate(pipeline);
 ```
 
+
+Correction : 
+```Shell
+var pipeline = [
+  {
+    $unwind: "$styles" // Décompose le tableau de styles en documents individuels
+  },
+  {
+    $sortByCount: "$styles" // Trie et compte le nombre de salles pour chaque style musical
+  },
+  {
+    $sort: { _id: 1 } // Trie les résultats par ordre alphabétique du style musical
+  }
+];
+
+db.salles.aggregate(pipeline);
+```
+
+
 Réponse : 
 ```Shell
 {
@@ -1043,7 +1061,6 @@ Exercice 6
 Écrivez le pipeline qui affichera le nom des salles ainsi qu’un tableau nommé avis_excellents qui contiendra uniquement les avis dont la note est de 10.
 
 ```Shell
-
 
 N affiche que les salle qui ont un avis de 10 :
 
